@@ -6,40 +6,66 @@ import arrow.core.right
 import arrow.fx.ForIO
 import arrow.fx.IO
 import arrow.fx.Queue
+import arrow.fx.extensions.fx
 import arrow.fx.extensions.io.concurrent.concurrent
 import arrow.fx.fix
 
 interface StreamEmitter<A> {
-  fun emit(a: A)
+  fun emit(a: () -> A)
   fun complete()
   fun onTerminate(f: () -> Unit)
 }
 
-object EmitterEnd
+object Complete
 
 /**
- * A pure Stream construction based on a StreamEmitter callback.
+ * An effectful(?) Stream construction based on a StreamEmitter callback.
  *
- * TODO consider having an effectful constructor
+ * Stream.fromEmitter { emitter ->
+ *   emiter.onTerminate { println("Done!") }
+ *   emitter.emit { 1 }
+ *   emitter.emit { 2 }
+ *   emitter.emit { 2 }
+ *   emitter.complete()
+ * }
  */
 fun <A> Stream.Companion.fromEmitter(emitter: (StreamEmitter<A>) -> Unit): Stream<A> {
-  val queue = Queue.bounded<ForIO, Either<EmitterEnd, A>>(1_000, IO.concurrent()).fix()
-  val emitterImpl = object : StreamEmitter<A> {
-    override fun emit(a: A) {
-      queue.flatMap { it.offer(a.right()) }.unsafeRunAsync { }
-    }
+  return Stream.Ongoing(
+    IO.fx {
+      val queue = !Queue.bounded<ForIO, Either<Complete, A>>(1_000, IO.concurrent())
+      val emitterImpl = object : StreamEmitter<A> {
+        override fun emit(a: () -> A) {
+          // TODO consider error case
+          queue.offer(a().right()).fix().unsafeRunAsync { }
+        }
 
-    override fun complete() {
-      queue.flatMap { it.offer(EmitterEnd.left()) }.unsafeRunAsync { }
-    }
+        override fun complete() {
+          queue.offer(Complete.left()).fix().unsafeRunAsync { }
+        }
 
-    override fun onTerminate(f: () -> Unit) {
+        override fun onTerminate(f: () -> Unit) {
+          TODO()
+        }
+      }
+
+      emitter(emitterImpl)
+      fromFiniteQueue(queue)
     }
-  }
-//  emitter(emitterImpl)
-//
-//  return Stream.Ongoing(
-//
-//  )
- TODO()
+  )
+}
+
+fun <A> Stream.Companion.fromFiniteQueue(queue: Queue<ForIO, Either<Complete, A>>): Stream<A> {
+  fun loop(): Stream<A> =
+    Stream.Ongoing(
+      IO.fx {
+        val valueOrCompletion = queue.take().bind()
+        valueOrCompletion.fold({
+          Stream.Empty
+        }, {
+          Stream.Cons(it, loop())
+        })
+      }
+    )
+
+  return loop()
 }

@@ -3,19 +3,21 @@ package arrow.streams
 import arrow.core.identity
 import arrow.fx.IO
 import arrow.fx.extensions.io.concurrent.raceN
+import arrow.fx.internal.TimeoutException
 import arrow.fx.typeclasses.Duration
+import arrow.fx.typeclasses.seconds
 import kotlin.coroutines.EmptyCoroutineContext
 
 class ForStream private constructor() {
   companion object
 }
-// typealias StreamOf<F, E, A> = arrow.Kind3<F, ForStream, E, A>
+typealias StreamOf<A> = arrow.Kind<ForStream, A>
 
-// @Suppress("UNCHECKED_CAST", "NOTHING_TO_INLINE")
-// inline fun <F, E, A> StreamOf<F, E, A>.fix(): Stream<F, E, A> =
-//    this as Stream<F, E, A>
+@Suppress("UNCHECKED_CAST", "NOTHING_TO_INLINE")
+inline fun <A> StreamOf<A>.fix(): Stream<A> =
+  this as Stream<A>
 
-sealed class Stream<out A> {
+sealed class Stream<out A> : StreamOf<A> {
   internal object Empty : Stream<Nothing>()
   internal data class Error(val error: Throwable) : Stream<Nothing>()
   internal data class Ongoing<A>(val promise: IO<Stream<A>>) : Stream<A>()
@@ -48,12 +50,13 @@ fun <A> Stream<A>.forEach(
 fun <A> Stream<A>.forEachSync(
   onNext: (A) -> Unit,
   onError: (Throwable) -> Unit = {},
-  onComplete: () -> Unit = {}
+  onComplete: () -> Unit = {},
+  timeout: Duration = 5.seconds
 ): Unit = when (this) { // TODO return cancelable
   Stream.Empty -> onComplete()
   is Stream.Error -> onError(error)
   is Stream.Ongoing -> {
-    promise.unsafeRunSync().forEachSync(onNext, onError, onComplete)
+    promise.unsafeRunTimed(timeout).fold({ throw TimeoutException("Sync op timeout!") }, { it.forEachSync(onNext, onError, onComplete) })
   }
   is Stream.Cons -> {
     onNext(head)
