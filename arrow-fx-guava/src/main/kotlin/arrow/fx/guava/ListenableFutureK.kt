@@ -67,29 +67,6 @@ data class ListenableFutureK<out A>(val value: ListenableFuture<out A>) : Listen
       }.k()
     }
 
-  fun <B> bracketCase(
-    use: (A) -> ListenableFutureK<B>,
-    release: (A, ExitCase<Throwable>) -> ListenableFutureK<Unit>
-  ): ListenableFutureK<B> = runBlocking {
-    future {
-
-      val a = this@ListenableFutureK.value.await()
-
-      try {
-        val result = use(a).value.await()
-        release(a, ExitCase.Completed)
-
-        result
-      } catch (e: Exception) {
-        release(a, ExitCase.Error(e))
-
-        throw e
-      }
-
-    }.k()
-  }
-
-
   companion object {
 
     fun <A> just(a: A): ListenableFutureK<A> =
@@ -110,13 +87,3 @@ data class ListenableFutureK<out A>(val value: ListenableFuture<out A>) : Listen
   }
 }
 
-fun <A> ListenableFutureK<A>.listenableFutureHandleErrorWith(f: (Throwable) -> ListenableFutureK<A>): ListenableFutureK<A> =
-  runBlocking {
-    future {
-      try {
-        this@listenableFutureHandleErrorWith.value.await()
-      } catch (e: Throwable) {
-        f(e).value.await()
-      }
-    }.k()
-  }

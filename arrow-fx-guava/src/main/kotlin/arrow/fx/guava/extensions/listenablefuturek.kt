@@ -1,24 +1,17 @@
 package arrow.fx.guava.extensions
 
 import arrow.Kind
-import arrow.core.Either
 import arrow.core.Eval
 import arrow.extension
 import arrow.fx.guava.ForListenableFutureK
 import arrow.fx.guava.ListenableFutureK
 import arrow.fx.guava.ListenableFutureKOf
 import arrow.fx.guava.fix
-import arrow.fx.guava.listenableFutureHandleErrorWith
 import arrow.fx.guava.k
-import arrow.fx.typeclasses.Bracket
-import arrow.fx.typeclasses.ExitCase
 import arrow.typeclasses.Applicative
-import arrow.typeclasses.ApplicativeError
 import arrow.typeclasses.Foldable
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
-import arrow.typeclasses.MonadError
-import arrow.typeclasses.MonadThrow
 import com.google.common.util.concurrent.Futures
 
 @extension
@@ -66,41 +59,3 @@ interface ListenableFutureKFoldable : Foldable<ForListenableFutureK> {
     fix().foldRight(lb, f)
 }
 
-@extension
-interface ListenableFutureKApplicativeError : ApplicativeError<ForListenableFutureK, Throwable>, ListenableFutureKApplicative {
-  override fun <A> raiseError(e: Throwable): ListenableFutureK<A> =
-    ListenableFutureK.raiseError(e)
-
-  override fun <A> Kind<ForListenableFutureK, A>.attempt(): ListenableFutureK<Either<Throwable, A>> = fix().attempt()
-
-  override fun <A> Kind<ForListenableFutureK, A>.handleErrorWith(f: (Throwable) -> Kind<ForListenableFutureK, A>): Kind<ForListenableFutureK, A> =
-    fix().listenableFutureHandleErrorWith {
-      f(it).fix()
-    }
-}
-
-@extension
-interface ListenableFutureKMonadError : MonadError<ForListenableFutureK, Throwable>, ListenableFutureKMonad, ListenableFutureKApplicativeError {
-  override fun <A, B> ListenableFutureKOf<A>.map(f: (A) -> B): ListenableFutureK<B> =
-    fix().map(f)
-
-  override fun <A> raiseError(e: Throwable): ListenableFutureK<A> =
-    ListenableFutureK.raiseError(e)
-
-  override fun <A> ListenableFutureKOf<A>.handleErrorWith(f: (Throwable) -> ListenableFutureKOf<A>): ListenableFutureK<A> =
-    fix().listenableFutureHandleErrorWith { f(it).fix() }
-}
-
-@extension
-interface ListenableFutureKMonadThrow : MonadThrow<ForListenableFutureK>, ListenableFutureKMonadError
-
-@extension
-interface ListenableFutureKBracket : Bracket<ForListenableFutureK, Throwable>, ListenableFutureKMonadThrow {
-
-  override fun <A, B> ListenableFutureKOf<A>.bracketCase(
-    release: (A, ExitCase<Throwable>) -> ListenableFutureKOf<Unit>,
-    use: (A) -> ListenableFutureKOf<B>
-  ): ListenableFutureK<B> =
-    fix().bracketCase({ use(it).fix() }, { a, e -> release(a, e).fix() })
-
-}
