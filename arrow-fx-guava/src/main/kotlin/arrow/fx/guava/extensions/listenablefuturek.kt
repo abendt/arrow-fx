@@ -58,4 +58,3 @@ interface ListenableFutureKFoldable : Foldable<ForListenableFutureK> {
   override fun <A, B> Kind<ForListenableFutureK, A>.foldRight(lb: Eval<B>, f: (A, Eval<B>) -> Eval<B>): Eval<B> =
     fix().foldRight(lb, f)
 }
-

@@ -14,7 +14,7 @@ import kotlinx.coroutines.runBlocking
 
 class ForListenableFutureK private constructor()
 
-typealias ListenableFutureKOf<A> = arrow.Kind<ForListenableFutureK, A>
+typealias ListenableFutureKOf<A> = Kind<ForListenableFutureK, A>
 
 @Suppress("UNCHECKED_CAST", "NOTHING_TO_INLINE")
 inline fun <A> ListenableFutureKOf<A>.fix(): ListenableFutureK<A> =
@@ -56,24 +56,10 @@ data class ListenableFutureK<out A>(val value: ListenableFuture<out A>) : Listen
   fun <B> foldRight(lb: Eval<B>, f: (A, Eval<B>) -> Eval<B>): Eval<B> =
     Eval.later { f(value.get(), lb).value() }
 
-  fun attempt(): ListenableFutureK<Either<Throwable, A>> =
-    runBlocking {
-      future {
-        try {
-          value.await().right()
-        } catch (e: Exception) {
-          e.left()
-        }
-      }.k()
-    }
-
   companion object {
 
     fun <A> just(a: A): ListenableFutureK<A> =
       Futures.immediateFuture(a).k()
-
-    fun <A> raiseError(e: Throwable): ListenableFutureK<A> =
-      Futures.immediateFailedFuture<A>(e).k()
 
     tailrec fun <A, B> tailRecM(a: A, f: (A) -> Kind<ForListenableFutureK, Either<A, B>>): ListenableFutureK<B> {
 
@@ -86,4 +72,3 @@ data class ListenableFutureK<out A>(val value: ListenableFuture<out A>) : Listen
     }
   }
 }
-
