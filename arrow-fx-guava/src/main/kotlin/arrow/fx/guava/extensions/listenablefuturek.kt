@@ -23,7 +23,7 @@ interface ListenableFutureKFunctor : Functor<ForListenableFutureK> {
 @extension
 interface ListenableFutureKApplicative : Applicative<ForListenableFutureK> {
   override fun <A> just(a: A): Kind<ForListenableFutureK, A> =
-    Futures.immediateFuture(a).k()
+    ListenableFutureK.just(a)
 
   override fun <A, B> Kind<ForListenableFutureK, A>.map(f: (A) -> B): ListenableFutureK<B> =
     fix().map(f)
