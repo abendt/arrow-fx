@@ -1,18 +1,17 @@
 package arrow.fx.guava.extensions
 
 import arrow.Kind
+import arrow.core.Either
 import arrow.core.Eval
 import arrow.extension
 import arrow.fx.guava.ForListenableFutureK
 import arrow.fx.guava.ListenableFutureK
 import arrow.fx.guava.ListenableFutureKOf
 import arrow.fx.guava.fix
-import arrow.fx.guava.k
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Foldable
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
-import com.google.common.util.concurrent.Futures
 
 @extension
 interface ListenableFutureKFunctor : Functor<ForListenableFutureK> {
@@ -45,7 +44,7 @@ interface ListenableFutureKMonad : Monad<ForListenableFutureK>, ListenableFuture
   override fun <A, B> ListenableFutureKOf<A>.map(f: (A) -> B): ListenableFutureK<B> =
     fix().map(f)
 
-  override fun <A, B> tailRecM(a: A, f: Function1<A, ListenableFutureKOf<arrow.core.Either<A, B>>>): ListenableFutureK<B> =
+  override fun <A, B> tailRecM(a: A, f: (A) -> ListenableFutureKOf<Either<A, B>>): ListenableFutureK<B> =
     ListenableFutureK.tailRecM(a, f)
 }
 
